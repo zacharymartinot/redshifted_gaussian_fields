@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#PBS -N model_1_ell0_500
+#PBS -V
+#PBS -j oe
+#PBS -q hera
+#PBS -l nodes=1:ppn=16
+#PBS -l vmem=255gb
+#PBS -m bea
+#PBS -M zmarti@sas.upenn.edu
+
+run_dir="/users/zmartino/zmartino/gaussian_field_generation/gaussian_field_generation/scripts/"
+
+cd ${run_dir}
+
+python -u model_1_ell0_500.py > output_model_1_ell0_500.o 2>&1
