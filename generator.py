@@ -7,6 +7,7 @@ from scipy.special import gamma as Gamma
 import multiprocessing as mp
 import h5py
 import os, sys
+import time
 
 import warnings
 
@@ -346,8 +347,8 @@ class MAPSBlock(object):
         counts = range(10,100,10)
         for l in range(self.Nell):
             ell_l = self.ell_axis[l]
-            if int(100.*float(l)/self.Nell) in counts:
-                print "About", counts.pop(0), "% done."
+            # if int(100.*float(l)/self.Nell) in counts:
+            #     print "About", counts.pop(0), "% done."
 
             for i in range(self.Nfreq_points):
                 nu_i = self.nu_arr[i]
@@ -407,7 +408,7 @@ class MAPSBlock(object):
         self.barC = np.zeros((self.Nell, self.Nfreq_points), dtype=np.float)
         self.barC_err = np.zeros((self.Nell, self.Nfreq_points), dtype=np.float)
 
-        counts = range(10,100,10)
+        counts = range(10,100,40)
         for l in range(self.Nell):
             ell_l = self.ell_axis[l]
             if int(100.*float(l)/self.Nell) in counts:
@@ -515,14 +516,16 @@ class GaussianCosmologicalFieldGenerator(object):
         nu_arr = self.nu_axis[nu_arr_inds]
         nup_arr = self.nu_axis[nup_arr_inds]
 
-        self.nu_arr_blocks = np.array_split(nu_arr, self.N_cpu)
-        self.nup_arr_blocks = np.array_split(nup_arr, self.N_cpu)
+        self.nu_arr_blocks = np.array_split(nu_arr, nu_arr.size)
+        self.nup_arr_blocks = np.array_split(nup_arr, nup_arr.size)
 
         common_parameters = (self.cosmo, self.del_nu, self.ell_axis_d, self.a, self.alpha, self.beta, self.sigma2, self.Np, self.eps)
         self.block_parameters = [(common_parameters, nu_arr_i, nup_arr_i) for nu_arr_i, nup_arr_i in zip(self.nu_arr_blocks, self.nup_arr_blocks)]
 
     def compute_MAPS(self):
         # use multiprocessing to compute blocks in parallel, then combine blocks
+
+        start_time = time.time()
 
         if self.block_parameters == None:
             self.plan_MAPS_blocks()
@@ -547,6 +550,8 @@ class GaussianCosmologicalFieldGenerator(object):
         else:
             self.barC = self.barC_init
 
+        end_time = time.time()
+        print "Elapsed time:", end_time - start_time
     def decompose_barC(self):
         # compute eigenvalue decomposition
         self.eig_vals, self.eig_vecs = np.linalg.eig(self.barC)
