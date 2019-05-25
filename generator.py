@@ -2,14 +2,22 @@ import numpy as np
 
 import numba
 from astropy import cosmology
-from scipy import special, integrate, interpolate, optimize
+from scipy import special, integrate, interpolate, optimize, linalg
 from scipy.special import gamma as Gamma
 import multiprocessing as mp
 import h5py
 import os, sys
+import git
 import time
 
 import warnings
+
+from redshifted_gaussian_fields import __path__ as rgf_path
+
+def get_commit_hash():
+    repo = git.Repo(rgf_path, search_parent_directories=True)
+    commit_hash = np.string_(repo.head.object.hexsha)
+    return commit_hash
 
 class GammaPowerSpectrum(object):
     def __init__(self, a, alpha, beta, sigma2):
@@ -554,14 +562,22 @@ class GaussianCosmologicalFieldGenerator(object):
         print "Elapsed time:", end_time - start_time
     def decompose_barC(self):
         # compute eigenvalue decomposition
-        self.eig_vals, self.eig_vecs = np.linalg.eig(self.barC)
+        self.eig_vals = np.zeros(self.barC.shape[:2])
+        self.eig_vecs = np.zeros(self.barC.shape)
+        for ll in range(self.barC.shape[0]):
+            self.eig_vals[ll], self.eig_vecs[ll] = linalg.eigh(self.barC[ll])
 
     def save_data(self, full_file_name):
 
         if self.overwrite == False and os.path.exists(full_file_name):
             raise ValueError('A save file with that name already exists.')
         else:
+
+            commit_hash = get_commit_hash()
+
             with h5py.File(full_file_name, 'w') as h5f:
+
+                h5f.create_dataset('commit_hash', data=commit_hash)
 
                 cosmology_name = np.string_(self.cosmo.name)
                 iparams = h5f.create_group('input_parameters')
@@ -583,6 +599,8 @@ class GaussianCosmologicalFieldGenerator(object):
                 # odata.create_dataset('barC_err', data=self.barC_err)
                 odata.create_dataset('eig_vals', data=self.eig_vals)
                 odata.create_dataset('eig_vecs', data=self.eig_vecs)
+
+
 
             self.overwrite = False
 
@@ -652,6 +670,59 @@ def sh_realization_healpy_index(eig_vals, eig_vecs, seed):
     a_lm[:,0]
 
     return a_lm
+
+def pow_neg2_CAPS(cosmo, nu_axis, del_nu, A0, ell_max):
+    nu_start = nu_axis[0] - 2*del_nu
+    nu_end = nu_axis[-1] + 2*del_nu
+
+    samples_per_MHz = 5./del_nu
+    N_samples = int(samples_per_MHz * (nu_end - nu_start))
+
+    r_func = ComovingDistanceApproximation(nu_start, nu_end, cosmo, nu_samples=N_samples)
+
+    r_axis = r_func(nu_axis)
+
+    ell_axis = np.arange(0,ell_max+1)
+
+    Nell = ell_axis.size
+    Nfreq = nu_axis.size
+
+    @numba.njit
+    def caps_inner(r_axis, ell_max):
+        Nfreq = r_axis.size
+        Nell = ell_max+1
+
+        C_bare = np.zeros((Nell, Nfreq, Nfreq), dtype=numba.float64)
+
+        for ell in range(Nell):
+            for jj in range(Nfreq):
+                for kk in range(Nfreq):
+                    if jj >= kk:
+                        r_j = r_axis[jj]
+                        r_k = r_axis[kk]
+
+                        # jj > kk is nu_j > nu_k, which means r_j < r_k
+                        C_bare[ell, jj, kk] = 1./r_k * (r_j/r_k)**ell
+
+                        if jj != kk:
+                            C_bare[ell, kk, jj] = C_bare[ell, jj, kk]
+
+            C_bare[ell] /= (2.*ell + 1.)
+
+        return C_bare
+
+    barC = A0 * caps_inner(r_axis, ell_max)
+
+    k_b = 1.38064852e-23 # joules/kelvin
+    c = 299792458. # meters/second
+    A_Jy = 1e26 # Jy / (Watt/meter^2/Hz)
+    nu_e = 1420.4057517667 # MHz
+
+    Jyobs_per_Ksrc = A_Jy * 2 * k_b *(1e6*nu_axis/c)**2. * (nu_axis/nu_e)
+
+    barC *= Jyobs_per_Ksrc[None,:,None] * Jyobs_per_Ksrc[None,None,:]
+
+    return barC
 
 def white_noise_variance(cosmo, nu_axis, del_nu, P0, eps='min'):
     """
