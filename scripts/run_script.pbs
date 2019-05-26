@@ -8,7 +8,7 @@
 #PBS -m bea
 #PBS -M zmarti@sas.upenn.edu
 
-run_dir="/users/zmartino/zmartino/gaussian_field_generation/gaussian_field_generation/scripts/"
+run_dir="/users/zmartino/zmartino/projects/redshifted_gaussian_fields/scripts/"
 
 cd ${run_dir}
 

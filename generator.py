@@ -13,6 +13,7 @@ import time
 import warnings
 
 from redshifted_gaussian_fields import __path__ as rgf_path
+rgf_path = rgf_path[0]
 
 def get_commit_hash():
     repo = git.Repo(rgf_path, search_parent_directories=True)
@@ -638,7 +639,7 @@ def restore_from_file(full_file_name):
 
     return gcfg
 
-@numba.njit
+@numba.njit(parallel=True)
 def sh_realization_healpy_index(eig_vals, eig_vecs, seed):
     Nell, Nfreq = eig_vals.shape
     ell_max = Nell-1
@@ -667,7 +668,7 @@ def sh_realization_healpy_index(eig_vals, eig_vecs, seed):
                 a_lm[i,:] += np.dot(V, sqrt_half_ev*r_re)
                 a_lm[i,:] += 1j*np.dot(V, sqrt_half_ev*r_im)
 
-    a_lm[:,0]
+    a_lm[:,0] = 0.
 
     return a_lm
 
