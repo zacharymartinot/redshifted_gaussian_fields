@@ -35,7 +35,7 @@ for ll in range(barC.shape[0]):
 
 N_realizations = 20
 
-save_location = '/users/zmartino/zmartino/gaussian_field_generation/gaussian_field_generation/saved_data/'
+save_location = '/users/zmartino/zmartino/projects/redshifted_gaussian_fields/saved_data/'
 
 file_name = 'power_law_neg2_100_200MHz_realizations.h5'
 
