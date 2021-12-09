@@ -4,6 +4,7 @@ import ctypes
 
 from scipy import interpolate, linalg, special
 from astropy import cosmology
+import healpy as hp
 
 import h5py
 import os
@@ -446,6 +447,16 @@ class GaussianCosmologicalFieldGenerator:
 
         return a_lm
 
+    def generate_healpix_map_realization(self, seed, nside):
+        a_lm = self.generate_realization(seed)
+
+        I_map = np.zeros((self.Nnu, 12*nside**2), dtype=float)
+        for ii in range(self.Nnu):
+            a_lm_hp = reindex_ssht2hp(a_lm[ii])
+            I_map[ii] = hp.alm2map(a_lm_hp, nside, pol=False)
+
+        return I_map
+
     def save_covariance_data(self, full_file_path, write_cov_data=True, write_eig_data=False, overwrite=False):
 
         if not overwrite and os.path.exists(full_file_path):
@@ -592,3 +603,32 @@ def restore_from_file(full_file_path):
             gcfg.seeds = [rseeds[k][()] for k in rseeds.keys()]
 
     return gcfg
+
+def reindex_hp2ssht(hp_flm, lmax=None):
+    if lmax is None:
+        lmax = hp.Alm.getlmax(hp_flm.size)
+
+    L = lmax + 1
+    ssht_flm = np.zeros(L**2, dtype=np.complex128)
+    for el in range(L):
+        for m in range(-el, el+1):
+            hp_idx = hp.Alm.getidx(lmax, el, abs(m))
+            ssht_idx = el*el + el + m
+            if m >= 0:
+                ssht_flm[ssht_idx] = hp_flm[hp_idx]
+            else:
+                ssht_flm[ssht_idx] = (-1.)**m * np.conj(hp_flm[hp_idx])
+    return ssht_flm
+
+def reindex_ssht2hp(flm):
+    L = int(np.sqrt(flm.size))
+    lmax = L - 1
+    hp_flm = np.zeros(hp.Alm.getsize(lmax), dtype=np.complex128)
+
+    for el in range(L):
+        for m in range(el+1):
+            hp_idx = hp.Alm.getidx(lmax, el, abs(m))
+            ssht_idx = el*el + el + m
+            hp_flm[hp_idx] = flm[ssht_idx]
+
+    return hp_flm

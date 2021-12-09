@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 import mpmath as mpm
 import numba as nb
+import healpy as hp
 from redshifted_gaussian_fields import generator
 
 def test_get_commit_hash():
@@ -83,7 +84,7 @@ def test_ive():
     ell_axis = np.linspace(0, 10**4, 1001)
 
     ive1 = generator.ive(ell_axis, 2e10)
-    ive2 = np.array(list(map(np.float, hp_ive(ell_axis, 2e10))))
+    ive2 = np.array(list(map(np.float64, hp_ive(ell_axis, 2e10))))
 
     assert np.all(np.abs(ive1 - ive2)/ive2 < 1e-15)
 
@@ -91,7 +92,7 @@ def test_ive():
     x_ax += x_ax[0]
 
     ive1 = generator.ive(20.5, x_ax)
-    ive2 = np.array(list(map(np.float, hp_ive(20.5, x_ax))))
+    ive2 = np.array(list(map(np.float64, hp_ive(20.5, x_ax))))
 
     assert np.all(np.amax(np.abs(ive1 - ive2)) < 1e-15)
 
@@ -114,7 +115,7 @@ def test_generate_inner_eval_bare_barC():
     x = np.linspace(-1., 1., 5)
 
     inner_eval_bare_barC = generator.generate_inner_eval_bare_barC()
-    assert isinstance(inner_eval_bare_barC, nb.targets.registry.CPUDispatcher)
+    assert isinstance(inner_eval_bare_barC, nb.core.registry.CPUDispatcher)
 
     barC = inner_eval_bare_barC(ell, r_ax, r_ax, nu_ax, nu_ax, a, k0, w, x)
     assert type(barC) is np.float64 or type(barC) is float
@@ -138,7 +139,7 @@ def test_generate_eval_bare_barC():
     eps = 0.
 
     eval_bare_barC =  generator.generate_eval_bare_barC(term_type='bump_gauss')
-    assert isinstance(eval_bare_barC, nb.targets.registry.CPUDispatcher)
+    assert isinstance(eval_bare_barC, nb.core.registry.CPUDispatcher)
 
     barC = eval_bare_barC(ell_axis, nu_sub_intervals, r_sub_intervals, a, k0, w, x, eps)
     assert barC.shape == (10, 2, 2)
@@ -158,6 +159,17 @@ def test_realization():
     generator.realization(ell, ev, V, a_lm)
 
     assert np.count_nonzero(a_lm) == Nnu*(2*ell + 1)
+
+def test_reindexing():
+    L = 51
+
+    alm_ssht = np.zeros(L**2, dtype=complex)
+
+    alm_hp = generator.reindex_ssht2hp(alm_ssht)
+
+    alm_ssht_rec = generator.reindex_hp2ssht(alm_hp)
+
+    assert np.allclose(alm_ssht, alm_ssht_rec)
 
 class TestGaussianCosmologicalFieldGenerator():
 
@@ -202,11 +214,15 @@ class TestGaussianCosmologicalFieldGenerator():
         # these two arrays should be exactly (to-the-bit) equal
         assert np.all(a_lm1 == a_lm2)
 
+    def test_generate_healpix_map_realization(self):
+        seed = 74839
+        nside = 16
+        I_map = self.gcfg.generate_healpix_map_realization(seed, nside)
+        Nnu = self.gcfg.nu_axis.size
+        assert I_map.shape == (Nnu, 12*nside**2)
+
     def test_save_covariance_data(self):
         pass
 
     def test_save_realization_seeds(self):
         pass
-
-def test_run():
-    pass
