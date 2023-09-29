@@ -352,10 +352,10 @@ def realization(ell, ev, V, a_lm):
 
             a_lm[:, idx] = np.dot(V, np.sqrt(ev/2.)* rr) + 1j*np.dot(V, np.sqrt(ev/2.)* ri)
 
-    nidxs = ell*ell + ell + np.arange(-ell, 0)
-    pidxs = ell*ell + ell + np.arange(1, ell+1)
-
-    a_lm[:, nidxs] = np.conj(a_lm[:, pidxs])
+    for m in range(-ell, 0):
+        neg_idx = ell*ell + ell + m
+        pos_idx = ell*ell + ell + abs(m)
+        a_lm[:, neg_idx] = (-1.0)**m * np.conj(a_lm[:, pos_idx])
 
     return
 
@@ -425,6 +425,12 @@ class GaussianCosmologicalFieldGenerator:
             self.eig_vals[nn], self.eig_vecs[nn] = linalg.eigh(self.barC[nn])
 
     def generate_realization(self, seed):
+        """
+        Returns a random realization of the spherical harmonic coefficients
+        of the specific intensity on the sky with statistics defined by
+        self.barC. The output data have units of Jy/sr in the observers inertial
+        frame.
+        """
         L = np.amax(self.ell_axis) + 1
         # a_lm = np.zeros((self.Nnu, L**2), dtype=np.complex128)
         np.random.seed(seed)
@@ -448,6 +454,12 @@ class GaussianCosmologicalFieldGenerator:
         return a_lm
 
     def generate_healpix_map_realization(self, seed, nside):
+        """
+        Returns a random realization the specific intensity on the sky with
+        statistics defined by self.barC, evaluated at HEALPix map pixel locations.
+        The output data have units of Jy/sr in the observers inertial
+        frame.
+        """
         a_lm = self.generate_realization(seed)
 
         I_map = np.zeros((self.Nnu, 12*nside**2), dtype=float)
