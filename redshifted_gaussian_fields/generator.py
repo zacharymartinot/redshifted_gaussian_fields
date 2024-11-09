@@ -469,6 +469,96 @@ class GaussianCosmologicalFieldGenerator:
 
         return I_map
 
+    def generate_healpix_map_realization_low_memeory(self, seed, nside, full_file_path, overwrite=False):
+        """
+        Alterative to generate_realization which uses intermediate I/O to control
+        the maximum memory usage.
+        """
+
+        if os.path.exists(full_file_path) and not overwrite:
+            raise ValueError("A file with that name already exists, and 'overwrite' is not set.")
+
+        L = np.amax(self.ell_axis) + 1
+
+        if not hasattr(self, 'eig_vals'):
+            print('Eigen-decomposition not yet set. Starting computation...')
+            self.compute_eigen_decomposition()
+            print('Eigen-decomposition done.')
+
+
+        # open file for both reading and writing, create it if it doesn't exist
+        with h5py.File(full_file_path, 'a') as h5f:
+
+            for key in ['alms', 'base_noise']:
+                if key in h5f.keys():
+                    del h5f[key]
+
+            h5f.create_dataset('alms', (self.Nnu, L**2), dtype='c16')
+            h5f.create_dataset('base_noise', (2*self.Nnu, L**2), dtype='f8')
+
+            np.random.seed(seed)
+
+            # this generates the white-noise realization in an ordering that will match
+            # the 'generate_realization' method, but without having to hold the full
+            # array in memory
+            for ii in range(2*self.Nnu):
+                r = np.random.randn(L**2)
+                h5f['base_noise'][ii, :] = r
+
+            for ll in range(self.Nell):
+
+                ell = self.ell_axis[ll]
+
+                # a_lm = np.random.randn(self.Nnu, 2*ell + 1) + 1j*np.random.randn(self.Nnu, 2*ell+1)
+                idx = ell*ell + ell + np.arange(-ell, ell+1)
+                r_here = h5f['base_noise'][:,idx]
+                a_lm = r_here[:self.Nnu] + 1j*r_here[self.Nnu:]
+
+                # h5f['a2'][:,idx] = np.copy(a_lm)
+
+                ev = self.eig_vals[ll]
+                V  = self.eig_vecs[ll]
+
+                for m in range(ell + 1):
+
+                    idx = ell + m
+
+                    if m == 0:
+                        rr = np.real(a_lm[:, idx])
+                        a_lm[:, idx] = np.dot(V, np.sqrt(ev) * rr)
+
+                    else:
+
+                        rr = np.real(a_lm[:,idx])
+                        ri = np.imag(a_lm[:,idx])
+
+                        a_lm[:,idx] = np.dot(V, np.sqrt(0.5*ev) * rr) + 1j*np.dot(V, np.sqrt(0.5*ev) * ri)
+
+                for m in range(-ell, 0):
+                    neg_idx = ell + m
+                    pos_idx = ell + abs(m)
+                    a_lm[:, neg_idx] = (-1.0)**m * np.conj(a_lm[:, pos_idx])
+
+                idx = ell*ell + ell + np.arange(-ell, ell+1)
+                h5f['alms'][:,idx] = a_lm
+
+            if 'healpix_maps' in h5f.keys():
+                del h5f['healpix_maps']
+
+            h5f.create_dataset('healpix_maps', (self.Nnu, 12*nside**2), dtype='f8')
+
+            for ii in range(self.Nnu):
+
+                a_lm = h5f['alms'][ii,:]
+
+                a_lm_hp = reindex_ssht2hp(a_lm)
+
+                I_map = hp.alm2map(a_lm_hp, nside, pol=False)
+
+                h5f['healpix_maps'][ii,:] = I_map
+
+            del h5f['alms']
+    
     def save_covariance_data(self, full_file_path, write_cov_data=True, write_eig_data=False, overwrite=False):
 
         if not overwrite and os.path.exists(full_file_path):
@@ -479,7 +569,7 @@ class GaussianCosmologicalFieldGenerator:
         commit_hash = get_commit_hash()
 
         if write_cov_data and not hasattr(self, 'barC'):
-            self.compute_cros_frequency_angular_power_spectrum()
+            self.compute_cross_frequency_angular_power_spectrum()
 
         if write_eig_data and not hasattr(self, 'eig_vals'):
             self.compute_eigen_decomposition()
