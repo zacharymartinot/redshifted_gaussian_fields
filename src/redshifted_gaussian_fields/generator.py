@@ -1,14 +1,18 @@
 import numpy as np
 import numba as nb
 import ctypes
+from pathlib import Path
 
 from scipy import interpolate, linalg, special
 from astropy import cosmology
 import healpy as hp
+import logging
 
 import h5py
 import os
 import git
+
+logger = logging.getLogger(__name__)
 
 from redshifted_gaussian_fields import __path__ as rgf_path
 
@@ -468,22 +472,22 @@ class GaussianCosmologicalFieldGenerator:
 
         return I_map
 
-    def generate_healpix_map_realization_low_memeory(self, seed, nside, full_file_path, overwrite=False):
+    def generate_healpix_map_realization_low_memory(self, seed: int, nside: int, full_file_path: str, overwrite: bool=False):
         """
         Alterative to generate_realization which uses intermediate I/O to control
         the maximum memory usage.
         """
-
-        if os.path.exists(full_file_path) and not overwrite:
+        full_file_path = Path(full_file_path)
+        
+        if full_file_path.exists() and not overwrite:
             raise ValueError("A file with that name already exists, and 'overwrite' is not set.")
 
         L = np.amax(self.ell_axis) + 1
 
         if not hasattr(self, 'eig_vals'):
-            print('Eigen-decomposition not yet set. Starting computation...')
+            logger.info('Eigen-decomposition not yet set. Starting computation...')
             self.compute_eigen_decomposition()
-            print('Eigen-decomposition done.')
-
+            logger.info('Eigen-decomposition done.')
 
         # open file for both reading and writing, create it if it doesn't exist
         with h5py.File(full_file_path, 'a') as h5f:
@@ -500,15 +504,20 @@ class GaussianCosmologicalFieldGenerator:
             # this generates the white-noise realization in an ordering that will match
             # the 'generate_realization' method, but without having to hold the full
             # array in memory
+            logger.info("Creating the white-noise realization")
             for ii in range(2*self.Nnu):
                 r = np.random.randn(L**2)
                 h5f['base_noise'][ii, :] = r
-
+                if (ii+1)%10 == 0:
+                    logger.info(f"  {ii+1}/{2*self.Nnu} channels done.")
+                    
+            logger.info("Computing a_lms...")
             for ll in range(self.Nell):
-
+                if (ll+1) % 10 == 0:
+                    logger.info(f"  {ll+1}/{self.Nell} ell-modes done.")
+                    
                 ell = self.ell_axis[ll]
 
-                # a_lm = np.random.randn(self.Nnu, 2*ell + 1) + 1j*np.random.randn(self.Nnu, 2*ell+1)
                 idx = ell*ell + ell + np.arange(-ell, ell+1)
                 r_here = h5f['base_noise'][:,idx]
                 a_lm = r_here[:self.Nnu] + 1j*r_here[self.Nnu:]
@@ -546,8 +555,11 @@ class GaussianCosmologicalFieldGenerator:
 
             h5f.create_dataset('healpix_maps', (self.Nnu, 12*nside**2), dtype='f8')
 
+            logger.info("Creating the healpix maps...")
             for ii in range(self.Nnu):
-
+                if (ii+1)%10 == 0:
+                    logger.info(f"  {ii+1}/{self.Nnu} channels done.")
+                    
                 a_lm = h5f['alms'][ii,:]
 
                 a_lm_hp = reindex_ssht2hp(a_lm)
@@ -576,12 +588,12 @@ class GaussianCosmologicalFieldGenerator:
         with h5py.File(full_file_path, 'w') as h5f:
 
             h5f.create_dataset('commit_hash', data=commit_hash)
-            h5f.create_dataset('numpy_version', data=np.string_(np.__version__))
+            h5f.create_dataset('numpy_version', data=np.bytes_(np.__version__))
 
-            cosmology_name = np.string_(self.cosmo.name)
+            cosmology_name = np.bytes_(self.cosmo.name)
             iparams = h5f.create_group('input_parameters')
 
-            iparams.create_dataset('full_file_path', data=np.string_(full_file_path))
+            iparams.create_dataset('full_file_path', data=np.bytes_(full_file_path))
 
             iparams.create_dataset('cosmology_name', data=cosmology_name)
 
@@ -594,7 +606,7 @@ class GaussianCosmologicalFieldGenerator:
             iparams.create_dataset('k0', data=self.k0)
             iparams.create_dataset('renormalization_point', data=self.Pspec.renormalization[0])
             iparams.create_dataset('renormalization_amplitude', data=self.Pspec.renormalization[1])
-            iparams.create_dataset('term_type', data=np.string_(self.term_type))
+            iparams.create_dataset('term_type', data=np.bytes_(self.term_type))
 
             iparams.create_dataset('Np', data=self.Np)
             iparams.create_dataset('eps', data=self.eps)

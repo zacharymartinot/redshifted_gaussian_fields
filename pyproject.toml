@@ -20,7 +20,9 @@ dependencies = [
     "astropy",
     "healpy",
     "h5py",
-    "gitpython"
+    "gitpython",
+    "hera-cli-utils",
+    "typer",
 ]
 requires-python = ">=3.6"
 keywords = ["radio astronomy", "interferometry"]
@@ -45,3 +47,6 @@ dev = ["redshifted_gaussian_fields[test]"]
 
 [project.urls]
 Repository = "https://github.com/zacharymartinot/redshifted_gaussian_fields"
+
+[project.scripts]
+rgf = "redshifted_gaussian_fields.cli:app"
