@@ -9,17 +9,16 @@ import healpy as hp
 import h5py
 import os
 import git
-import time
 
 from redshifted_gaussian_fields import __path__ as rgf_path
 
 def get_commit_hash():
     try:
         repo = git.Repo(rgf_path, search_parent_directories=True)
-        commit_hash = np.string_(repo.head.object.hexsha)
+        commit_hash = np.bytes_(repo.head.object.hexsha)
 
     except git.NoSuchPathError:
-        commit_hash = np.string_('none')
+        commit_hash = np.bytes_('none')
 
     return commit_hash
 

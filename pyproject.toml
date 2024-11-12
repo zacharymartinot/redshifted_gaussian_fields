@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "redshifted_gaussian_fields"
+authors = [
+    {name = "Zachary Martinot", email = "zmarti@sas.upenn.edu"},
+]
+maintainers = [
+    {name = "Zachary Martinot", email = "zmarti@sas.upenn.edu"},
+    {name = "Steven Murray", email = "murray.steveng@gmail.com"},
+]
+description = "Minimally realistic simulations of redshifted Gaussian intensity fields on the sky for testing 21-cm power spectrum measurement methods."
+readme = "README.md"
+dependencies = [
+    "numpy",
+    "numba>=0.58",
+    "scipy",
+    "astropy",
+    "healpy",
+    "h5py",
+    "gitpython"
+]
+requires-python = ">=3.6"
+keywords = ["radio astronomy", "interferometry"]
+classifiers = [
+    "License :: OSI Approved :: BSD License",
+    "Development Status :: 1 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+version = "0.0.3"
+
+[project.optional-dependencies]
+test = ["pytest", "mpmath"]
+dev = ["redshifted_gaussian_fields[test]"]
+
+[project.urls]
+Repository = "https://github.com/zacharymartinot/redshifted_gaussian_fields"
